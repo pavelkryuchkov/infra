@@ -1,0 +1,46 @@
+name: Release
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Create changelog text
+        id: changelog
+        uses: loopwerk/tag-changelog@v1
+        env:
+          ACTOR: ${{github.actor}}
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config_file: .github/tag-changelog-config.js
+          exclude_types: other,doc,chore
+
+      - name: Install Deps
+        run: npm ci
+
+      - name: Create or Update Release
+        env:
+          BRANCH: ${{ github.ref_name }}
+          TOKEN: ${{secrets.GITHUB_TOKEN}}
+          # BODY: ${{ steps.changelog.outputs.changelog }}
+          BODY: ${{steps.changelog.outputs.changes}}
+          VERSION: ${BRANCH##*/}
+          ACTOR: ${{github.actor}}
+        run: node scripts/change-release-issue.js
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: build
